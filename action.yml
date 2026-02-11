@@ -1,49 +1,48 @@
-name: Readme Stats Action
-description: Generate GitHub Readme Stats cards in GitHub Actions using the Go service.
-author: soulteary
-inputs:
-  card:
-    description: Card type to generate (stats, top-langs, pin, wakatime, gist).
-    required: true
-  options:
-    description: Options for the card (query string or JSON).
-    required: false
-    default: ""
-  path:
-    description: Output path for SVG file (relative path; include filename with .svg).
-    required: false
-    default: ""
-  token:
-    description: GitHub token (PAT or GITHUB_TOKEN).
-    required: false
-    default: ""
-  version:
-    description: Version of github-readme-stats binary to use (e.g., v1.0.0). Defaults to latest.
-    required: false
-    default: "v1.0.0"
-  repo:
-    description: GitHub repository in format owner/repo. Defaults to soulteary/github-readme-stats.
-    required: false
-    default: "soulteary/github-readme-stats"
-outputs:
-  path:
-    description: Path where the SVG file was written.
-runs:
-  using: composite
-  steps:
-    - name: Generate card
-      run: bash "${{ github.action_path }}/index.sh"
-      shell: bash
-      env:
-        INPUT_CARD: ${{ inputs.card }}
-        INPUT_OPTIONS: ${{ inputs.options }}
-        INPUT_PATH: ${{ inputs.path }}
-        INPUT_TOKEN: ${{ inputs.token || github.token }}
-        INPUT_VERSION: ${{ inputs.version }}
-        INPUT_REPO: ${{ inputs.repo }}
-        PAT_1: ${{ inputs.token || github.token }}
-        GITHUB_ACTION_PATH: ${{ github.action_path }}
+name: Update README cards
 
-branding:
-  icon: bar-chart-2
-  color: blue
+on:
+  schedule:
+    - cron: "0 0 * * *" # 매일 자정에 한 번 실행
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate stats card
+        uses: soulteary/github-readme-stats-action@v1.0.0
+        with:
+          card: stats
+          options: 'username=${{ github.repository_owner }}&show_icons=true'
+          path: profile/stats.svg
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate top languages card
+        uses: soulteary/github-readme-stats-action@v1.0.0
+        with:
+          card: top-langs
+          options: 'username=${{ github.repository_owner }}&layout=compact&langs_count=6'
+          path: profile/top-langs.svg
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate pin card
+        uses: soulteary/github-readme-stats-action@v1.0.0
+        with:
+          card: pin
+          options: 'username=soulteary&repo=github-readme-stats'
+          path: profile/pin-github-readme-stats.svg
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Commit cards
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add profile/*.svg
+          git commit -m "Update README cards" || exit 0
+          git push
